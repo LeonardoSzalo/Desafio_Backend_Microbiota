@@ -1,6 +1,6 @@
 🧬 Plataforma de Análise Preditiva de Microbiota
 <div align="center">
-<img src="static/inside_logo.png" alt="Logo Inside Diagnósticos" width="250px">
+<img src="https://www.google.com/search?q=https://raw.githubusercontent.com/LeonardoSzalo/Desafio_Backend_Microbiota/main/static/inside_logo.png" alt="Logo Inside Diagnósticos" width="250px">
 </div>
 
 <p align="center">
@@ -8,124 +8,108 @@
 </p>
 
 <p align="center">
+<a href="https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota"><img src="https://www.google.com/search?q=https://img.shields.io/badge/Reposit%C3%B3rio-GitHub-blueviolet" alt="Repositório"></a>
 <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Versão do Python">
 <img src="https://img.shields.io/badge/Framework-Flask-black.svg" alt="Flask">
-<img src="https://img.shields.io/badge/License-MIT-green.svg" alt="Licença">
 </p>
 
-📜 Descrição
-Este projeto, desenvolvido como solução para um desafio técnico de back-end, é uma plataforma robusta que vai além dos requisitos básicos. A aplicação permite que usuários façam o upload de dados de sequenciamento de microbiota (em formato CSV ou Excel) para obter predições, análises de diversidade e laudos detalhados. A interface web, construída com Flask, oferece uma experiência de usuário intuitiva, enquanto o back-end utiliza um ecossistema de bibliotecas de Data Science e IA para entregar resultados precisos e visualmente ricos.
+🚀 Como Executar o Projeto: Guia Rápido
+Este guia detalha o passo a passo para clonar, configurar e executar a plataforma em seu ambiente local.
 
-✨ Funcionalidades Principais
-Interface Web Intuitiva: Upload de arquivos de referência e amostras-alvo diretamente pelo navegador.
+Passo 1: Clonar o Repositório
+Primeiro, clone este repositório para a sua máquina local usando o seguinte comando no terminal:
 
-Modelos Preditivos: Treinamento de modelos de Machine Learning (RandomForestRegressor) em tempo real para predizer idade (age_months) e peso (body_weight).
+git clone [https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota.git](https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota.git)
+cd Desafio_Backend_Microbiota
 
-Métricas de Ecologia: Cálculo automático de diversidade Alfa (Shannon) e Beta (PCoA) para comparar a similaridade entre amostras.
+Passo 2: Configurar o Ambiente Virtual
+É uma forte recomendação usar um ambiente virtual para isolar as dependências do projeto e evitar conflitos.
 
-Visualização de Dados: Geração dinâmica de gráficos de abundância e de análise de similaridade (PCoA) com Matplotlib.
-
-Insights com IA: Integração com a API do Google Gemini para gerar resumos e insights baseados nas bactérias mais abundantes, com consulta em tempo real ao PubMed.
-
-Exportação de Resultados: Salvamento automático de um relatório completo em formato JSON.
-
-Gerador de Laudo Offline: Um script auxiliar para gerar o laudo visual em HTML a partir de um arquivo JSON de resultados, sem a necessidade de rodar o servidor.
-
-🔧 Pré-requisitos
-Antes de começar, garanta que você tem o seguinte instalado:
-
-Python 3.9 ou superior
-
-🚀 Instalação e Configuração
-Siga estes passos para configurar e rodar o projeto localmente.
-
-1. Clone o Repositório
-
-git clone https://github.com/seu-usuario/nome-do-repositorio.git
-cd nome-do-repositorio
-
-2. Crie e Ative um Ambiente Virtual
-É uma forte recomendação usar um ambiente virtual para isolar as dependências do projeto.
-
-# Criar o ambiente
+# Criar o ambiente virtual
 python -m venv venv
 
-# Ativar no Windows
+# Ativar o ambiente no Windows
 venv\Scripts\activate
 
-# Ativar no macOS/Linux
+# Ativar o ambiente no macOS/Linux
 source venv/bin/activate
 
-3. Configure as Chaves de API
-Este projeto precisa de chaves para as APIs do Google Gemini e do NCBI PubMed.
+Com o ambiente ativado, seu terminal deve exibir (venv) no início da linha.
 
-Crie uma cópia do arquivo de exemplo .env.example (se não existir, crie um) e renomeie para .env.
-
-Abra o arquivo .env e insira suas chaves e e-mail.
-
-DEV_GEMINI_API_KEY="SUA_CHAVE_REAL_DO_GEMINI_AQUI"
-DEV_NCBI_API_KEY="SUA_CHAVE_REAL_DO_NCBI_AQUI"
-NCBI_EMAIL="SEU_EMAIL_CADASTRADO_NO_NCBI"
-
-⚠️ Importante: O arquivo .env já está listado no .gitignore, então suas chaves nunca serão enviadas para o GitHub.
-
-4. Instale as Dependências
-Use o arquivo requirements.txt para instalar todas as bibliotecas necessárias de uma só vez.
+Passo 3: Instalar as Dependências
+Todas as bibliotecas necessárias estão listadas no arquivo requirements.txt. Instale todas de uma só vez com o comando:
 
 pip install -r requirements.txt
 
-USAGE
-Existem duas formas de utilizar esta aplicação.
+Passo 4: Configurar as Chaves de API (Passo Crucial)
+Para que a geração de insights com IA funcione, você precisa inserir as chaves de API diretamente no código. As chaves necessárias serão fornecidas por e-mail.
 
-1. Rodando a Aplicação Web (Servidor Local)
-Esta é a forma principal de uso, que permite interagir com a plataforma através do navegador.
+Abra o arquivo app.py em um editor de código.
 
-A. Inicie o Servidor Flask
+Localize as seguintes linhas (próximo à linha 18):
+
+#CHAVES APIs
+DEV_GEMINI_API_KEY= "INCLUIR CHAVE GEMINI"
+DEV_NCBI_API_KEY= "INCLUIR CHAVE NCBI"
+NCBI_EMAIL="INCLUIR EMAIL"
+
+Substitua os textos de exemplo pelas chaves e e-mail que você recebeu. O resultado deve ser parecido com isto:
+
+#CHAVES APIs
+DEV_GEMINI_API_KEY= "sua-chave-real-do-gemini-aqui"
+DEV_NCBI_API_KEY= "sua-chave-real-do-ncbi-aqui"
+NCBI_EMAIL="seu-email-real-aqui"
+
+Salve o arquivo app.py.
+
+Passo 5: Executar a Aplicação
+Com tudo configurado, inicie o servidor Flask:
 
 flask run
 # Ou, alternativamente:
 python app.py
 
-B. Acesse a Plataforma
-Abra seu navegador e acesse o endereço:
-http://127.0.0.1:5000
+Abra seu navegador e acesse http://127.0.0.1:5000.
 
-C. Execute a Análise
+Passo 6: Utilizar a Plataforma
+Na página inicial, faça o upload dos arquivos de exemplo para teste.
 
-Na página inicial, faça o upload do arquivo da Base de Dados de Referência.
+Base de Referência: Use o arquivo referencia.csv da pasta arquivos_referencia_e_alvo.
 
-Faça o upload de uma ou mais Amostras Alvo.
+Amostra(s) Alvo: Use um ou mais arquivos alvo_*.xlsx da mesma pasta.
 
-Clique em "Analisar Amostras" e aguarde o processamento.
+Clique em "Analisar Amostras".
 
-O laudo completo será exibido na tela e um arquivo JSON com os resultados será salvo na pasta uploads/.
+Aguarde o processamento. O laudo completo será exibido na tela.
 
-2. Gerando um Laudo Offline
-Se você já executou uma análise pela aplicação web, um arquivo de resultados (analysis_results_*.json) foi salvo. Você pode usar o script gerador_html.py para recriar o laudo visual sem precisar rodar o servidor.
+📁 Armazenamento e Geração de Laudos
+Laudos em Formato JSON
+Ao final de cada análise, a aplicação cria automaticamente a pasta uploads/ (se ainda não existir) e salva um arquivo .json contendo todos os dados brutos, predições e métricas geradas. Este arquivo serve como um registro permanente da análise.
 
-A. Execute o Script
-Use o seguinte comando, passando o caminho para o arquivo JSON como argumento:
+Revisando Laudos Anteriores (sem reprocessar)
+Se você deseja apenas visualizar um laudo que já foi gerado, não é necessário rodar a análise novamente. Utilize o script gerador_html.py.
+
+Encontre o arquivo .json da análise desejada dentro da pasta uploads/.
+
+Execute o seguinte comando no terminal, substituindo o nome do arquivo pelo seu:
 
 python gerador_html.py "uploads/analysis_results_20250811_144205.json"
 
-B. Visualize o Resultado
-Um arquivo chamado laudo_visual.html será criado na raiz do projeto. Abra-o em qualquer navegador para ver o relatório.
+Um novo arquivo, laudo_visual.html, será criado na pasta principal do projeto. Abra-o em qualquer navegador para ver o relatório completo.
 
-🛠️ Tecnologias Utilizadas
-Back-end: Python
+✨ Funcionalidades e Tecnologias
+Interface Web Intuitiva: Upload de arquivos de referência e amostras-alvo diretamente pelo navegador.
 
-Framework Web: Flask
+Modelos Preditivos: Treinamento de modelos de Machine Learning (RandomForestRegressor) em tempo real para predizer idade e peso.
 
-Análise de Dados: Pandas, NumPy
+Métricas de Ecologia: Cálculo automático de diversidade Alfa (Shannon) e Beta (PCoA).
 
-Machine Learning: Scikit-learn
+Visualização de Dados: Geração dinâmica de gráficos com Matplotlib.
 
-Análise de Bioinformática: SciPy, Scikit-bio, Biopython
+Insights com IA: Integração com a API do Google Gemini para gerar resumos científicos.
 
-Visualização: Matplotlib
+Back-end: Python, Flask
 
-IA Generativa: Google Generative AI (Gemini)
+Análise de Dados: Pandas, NumPy, Scikit-learn, SciPy, Scikit-bio, Biopython
 
 Templating: Jinja2
-
-Gerenciamento de Segredos: python-dotenv
