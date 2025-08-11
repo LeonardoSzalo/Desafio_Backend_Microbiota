@@ -1,1 +1,16 @@
+# Arquivo de variáveis de ambiente (contém segredos)
 .env
+
+# Ambiente Virtual
+venv/
+
+# Arquivos de Cache do Python
+__pycache__/
+*.pyc
+
+# Pasta de uploads e resultados gerados pela aplicação
+uploads/
+
+# Arquivos de sistema (gerados pelo macOS, Windows)
+.DS_Store
+Thumbs.db

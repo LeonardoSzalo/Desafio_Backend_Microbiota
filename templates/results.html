@@ -1,162 +1,265 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultados da Análise</title>
+    <title>Laudo de Análise de Microbiota</title>
+{% if standalone_mode %}
+    <link rel="icon" type="image/png" href="../static/inside_logo.png">
+{% else %}
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='inside_logo.png') }}">
+{% endif %}    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); max-width: 800px; margin: auto; }
-        h1 { text-align: center; color: #333; }
-        h2 { color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
-        h3 { color: #666; margin-top: 20px; }
-        p { margin-bottom: 10px; }
-        strong { color: #000; }
-        .section-item { 
-            background-color: #e9f5e9; 
-            border-left: 5px solid #4CAF50; 
-            padding: 15px; 
-            margin-bottom: 15px; 
-            border-radius: 5px; 
+        :root {
+            --primary-text: #1A2C4B; /* Azul escuro */
+            --secondary-text: #5a6474;
+            --accent-color: #E91E63; /* Tom de rosa/vermelho predominante */
+            --background-light: #f8f9fa;
+            --white: #ffffff;
+            --border-color: #dee2e6;
         }
-        .metrics-item { 
-            background-color: #e0f2f7; 
-            border-left: 5px solid #2196F3; 
-            padding: 15px; 
-            margin-bottom: 15px; 
-            border-radius: 5px; 
+        body {
+            font-family: 'Poppins', Arial, sans-serif;
+            margin: 0;
+            background-color: var(--background-light);
+            color: var(--secondary-text);
         }
-        .error-message { 
-            color: red; 
-            font-weight: bold; 
-            text-align: center; 
-            padding: 15px; 
-            background-color: #ffe0e0; 
-            border: 1px solid red; 
-            border-radius: 5px; 
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .report-header {
+            padding: 30px;
+            background-color: var(--primary-text);
+            color: var(--white);
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .logo-container {
+            max-width: 200px;
             margin-bottom: 20px;
+        }
+        .logo {
+            width: 100%;
+            height: auto;
+        }
+        .report-header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        .report-header h1 span {
+            color: var(--accent-color);
+        }
+        .card {
+            background-color: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+            overflow: hidden;
+            border-top: 4px solid var(--accent-color);
+        }
+        .card-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-header h2, .card-header h3 {
+            margin: 0;
+            color: var(--primary-text);
+            font-size: 1.5em;
+        }
+        .card-body {
+            padding: 25px;
+            display: grid;
+            gap: 25px;
+            grid-template-columns: 1fr 1fr;
+        }
+        .metric-group {
+            grid-column: span 1;
+        }
+        .metric-group h4 {
+            font-size: 1.1em;
+            color: var(--primary-text);
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 5px;
+            display: inline-block;
+        }
+        .metric {
+            background-color: var(--background-light);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-color);
+            margin-bottom: 10px;
+        }
+        .metric p {
+            margin: 0;
+            font-size: 1em;
+        }
+        .metric strong {
+            color: var(--primary-text);
+            font-weight: 600;
+        }
+        .plot-container, .ai-insight, .full-width {
+            grid-column: 1 / -1;
         }
         .plot-container {
             text-align: center;
-            margin-top: 20px;
-            margin-bottom: 30px;
-            padding: 15px;
-            border: 1px solid #ddd;
+            padding: 20px;
+            background-color: var(--background-light);
             border-radius: 8px;
-            background-color: #fcfcfc;
+        }
+        .plot-container h3 {
+             color: var(--primary-text);
+             margin-top: 0;
         }
         .plot-container img {
             max-width: 100%;
             height: auto;
-            border-radius: 5px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        .back-button { display: block; width: 150px; margin: 20px auto; padding: 10px; text-align: center; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; transition: background-color 0.3s ease; }
-        .back-button:hover { background-color: #0056b3; }
-        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 0.9em; }
+        .ai-insight {
+            background-color: #ffebee;
+            border-left: 4px solid var(--accent-color);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .ai-insight p {
+            font-style: italic;
+            margin: 0;
+        }
+        .back-button {
+            display: block; width: 180px; margin: 40px auto; padding: 12px; text-align: center;
+            background-color: var(--accent-color); color: white; text-decoration: none; border-radius: 8px;
+            transition: background-color 0.3s, transform 0.2s; font-weight: 600;
+        }
+        .back-button:hover { background-color: #f06292; transform: translateY(-2px); }
+        .error-message { text-align: center; padding: 40px; background-color: #fff3f3; border: 1px solid #ffcdd2; color: #c62828; border-radius: 12px; }
+
+        @media (max-width: 768px) {
+            .card-body {
+                grid-template-columns: 1fr;
+            }
+            .metric-group {
+                grid-column: span 1;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Laudo da Análise da Microbiota Intestinal</h1>
-
         {% if error %}
-            <div class="error-message">
-                <p><strong>Erro no processamento:</strong></p>
+            <div class="card error-message">
+                <h2>Ocorreu um Erro</h2>
                 <p>{{ error }}</p>
-                <p>Por favor, verifique os arquivos enviados e tente novamente.</p>
             </div>
-        {% else %}
-            <h2>Predições para o Indivíduo:</h2>
-            {% for key, value in predictions.items() %} 
-                <div class="section-item">
-                    <p><strong>{{ key.replace('_', ' ').title() }}:</strong> {{ "{:.2f}".format(value) }}</p>
+        {% elif results %}
+            <div class="report-header">
+                <div class="logo-container">
+                    {% if standalone_mode %}
+                        <img src="../static/inside_logo.png" alt="Logo Inside Diagnósticos" class="logo">
+                    {% else %}
+                        <img src="{{ url_for('static', filename='inside_logo.png') }}" alt="Logo Inside Diagnósticos" class="logo">
+                    {% endif %}
                 </div>
-            {% endfor %}
-
-            <h2>Diversidade Alfa (Índice de Shannon):</h2>
-            <div class="section-item">
-                {% if alpha_diversity_value is not none %}
-                    <p><strong>Indivíduo Alvo (Shannon):</strong> {{ "{:.2f}".format(alpha_diversity_value) }}</p>
-                {% else %}
-                    <p>Não foi possível calcular o Índice de Shannon para o Indivíduo Alvo.</p>
-                {% endif %}
-
-                {% if alpha_diversity_ref_mean is not none and alpha_diversity_ref_std is not none %}
-                    <p><strong>Base de Referência (Média Shannon ± Desvio Padrão):</strong> {{ "{:.2f}".format(alpha_diversity_ref_mean) }} ± {{ "{:.2f}".format(alpha_diversity_ref_std) }}</p>
-                    <p><em>(O Índice de Shannon é uma medida de diversidade da microbiota. Valores mais altos indicam maior diversidade.)</em></p>
-                {% else %}
-                    <p>Não foi possível calcular a média e o desvio padrão do Índice de Shannon para a Base de Referência.</p>
-                {% endif %}
+                <h1>Laudo de Análise Preditiva<span>.</span></h1>
             </div>
 
-            <h2>Índice de Maturação da Microbiota (MAZ):</h2>
-            <div class="section-item">
-                {% if maz_value is not none %} 
-                    <p><strong>MAZ:</strong> {{ "{:.2f}".format(maz_value) }}</p>
-                    <p><em>(O MAZ indica o desvio da idade da microbiota predita em relação à mediana da idade da microbiota predita da base de referência saudável, em desvios padrão.)</em></p>
-                {% else %}
-                    <p>Não foi possível calcular o MAZ (Microbial Age Z-score). Verifique os dados ou a variância na base de referência.</p>
-                {% endif %}
-            </div>
-
-            <h2>Análise da Composição da Microbiota:</h2>
-            {% if pcoa_plot_url %}
-                <div class="plot-container">
-                    <h3>Posicionamento do Indivíduo Alvo (PCoA da Distância Bray-Curtis)</h3>
-                    <img src="data:image/png;base64,{{ pcoa_plot_url }}" alt="PCoA Plot">
-                    <p><em>(Este gráfico mostra a similaridade na composição da microbiota. Cada ponto representa um indivíduo, e pontos mais próximos são mais similares. O 'X' vermelho indica a posição do indivíduo alvo em relação à base de referência.)</em></p>
-                </div>
-            {% else %}
-                <p>Não foi possível gerar o gráfico de similaridade (PCoA). Verifique os dados de abundância.</p>
-            {% endif %}
-
-            {% if top_bacteria_plot_url %}
-                <div class="plot-container">
-                    <h3>Bactérias Mais Abundantes no Indivíduo Alvo</h3>
-                    <img src="data:image/png;base64,{{ top_bacteria_plot_url }}" alt="Top Bacteria Bar Plot">
-                    <p><em>(Este gráfico de barras exibe a abundância relativa das 10 espécies bacterianas mais prevalentes no indivíduo alvo. 'Outros' agrupa as espécies restantes, se houver mais de 10.)</em></p>
-                </div>
-            {% else %}
-                <p>Não foi possível gerar o gráfico das bactérias mais abundantes. Verifique os dados da amostra alvo.</p>
-            {% endif %}
-
-            {% if gemini_insight_text %}
-                <div class="section-item">
-                    <h3>Insight das Bactérias Mais Abundantes (Gerado por IA):</h3>
-                    <p><em>{{ gemini_insight_text }}</em></p>
-                </div>
-            {% endif %}
-
-            <h2>Parâmetros de Desempenho dos Modelos de Predição:</h2>
-            {% for target, metric_data in metrics.items() %}
-                {# Garante que 'microbial_age' não apareça nos parâmetros de desempenho #}
-                {% if target != 'microbial_age' %}
-                    <div class="metrics-item">
-                        <h3>Modelo para {{ target.replace('_', ' ').title() }}:</h3>
-                        <p><strong>R² (Coeficiente de Determinação):</strong> 
-                            {% if metric_data.R2 is not none %}
-                                {{ "{:.4f}".format(metric_data.R2) }}
-                            {% else %}
-                                N/A (Não foi possível calcular, talvez devido a dados insuficientes no teste ou valores constantes)
-                            {% endif %}
-                        </p>
-                        <p><strong>MAE (Erro Absoluto Médio):</strong> 
-                            {% if metric_data.MAE is not none %}
-                                {{ "{:.4f}".format(metric_data.MAE) }}
-                            {% else %}
-                                N/A (Não foi possível calcular)
-                            {% endif %}
-                        </p>
-                        <p><em>(O R² indica o quão bem o modelo explica a variabilidade dos dados (0 a 1, sendo 1 perfeito). O MAE representa o erro médio absoluto das predições, na mesma unidade da variável alvo.)</em></p>
+            {% for individual in results.individual_analyses %}
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Laudo para Amostra: <strong>{{ individual.filename }}</strong></h2>
                     </div>
-                {% endif %}
+                    <div class="card-body">
+                        {% if individual.error %}
+                            <div class="error-message full-width">{{ individual.error }}</div>
+                        {% else %}
+                             <div class="metric-group">
+                                <h4>Comparativo de Predições</h4>
+                                {% for key, values in individual.comparison_metrics.items() %}
+                                    <div class="metric">
+                                        <p><strong>{{ key.replace('_', ' ').title() }}:</strong></p>
+                                        <p>Valor Real: {{ "%.2f"|format(values.real) if values.real is not none else 'N/A' }} |
+                                           Valor Predito: {{ "%.2f"|format(values.predicted) }}
+                                        </p>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="metric-group">
+                                <h4>Métricas de Ecologia e Maturação</h4>
+                                <div class="metric">
+                                    <p><strong>Diversidade Alfa (Shannon):</strong> {{ "%.2f"|format(individual.alpha_diversity_value) if individual.alpha_diversity_value is not none else 'N/A' }}</p>
+                                    <p><small><em>Referência (Média ± DP): {{ "%.2f"|format(results.reference_alpha_diversity.mean) }} ± {{ "%.2f"|format(results.reference_alpha_diversity.std) }}</em></small></p>
+                                </div>
+                                <div class="metric">
+                                    <p><strong>Maturação (MAZ) do Indivíduo:</strong> {{ "%.2f"|format(individual.maz_value) if individual.maz_value is not none else 'N/A' }}</p>
+                                    <p><small><em>Média MAZ da Referência: {{ "%.2f"|format(results.reference_maz_mean) }} (por definição)</em></small></p>
+                                </div>
+                            </div>
+                            
+                            <div class="plot-container full-width">
+                                <h3>Análise de Similaridade (PCoA)</h3>
+                                {% if individual.pcoa_plot_url %}
+                                    <img src="data:image/png;base64,{{ individual.pcoa_plot_url }}" alt="PCoA Plot">
+                                    <p><em>O gráfico representa a distância da microbiota intestinal entre indivíduos. Bolinha próximas representam
+                                        microbiotas parecidas.
+                                        Posicionamento da amostra (círculo vermelho) em relação à base de referência. A cor indica a idade.</em></p>
+                                {% else %}
+                                    <p><em>Gráfico indisponível para esta amostra.</em></p>
+                                {% endif %}
+                            </div>
+
+                             <div class="plot-container full-width">
+                                <h3>Composição da Amostra</h3>
+                                {% if individual.top_bacteria_plot_url %}
+                                    <img src="data:image/png;base64,{{ individual.top_bacteria_plot_url }}" alt="Top Bacteria Bar Plot">
+                                    <p><em>As 10 espécies mais abundantes na amostra.</em></p>
+                                {% else %}
+                                     <p><em>Gráfico indisponível para esta amostra.</em></p>
+                                {% endif %}
+                            </div>
+
+                            <div class="ai-insight full-width">
+                                <h4>Insight da Análise (gerado por IA)</h4>
+                                <p>{{ individual.gemini_insight_text }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
             {% endfor %}
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3>Desempenho do Modelo Preditivo</h3>
+                </div>
+                <div class="card-body">
+                    {% for target, metric_data in results.model_performance.items() %}
+                        <div class="metric-group">
+                            <h4>Modelo para {{ target.replace('_', ' ').title() }}</h4>
+                            <div class="metric">
+                                <p><strong>Coeficiente de Determinação (R²):</strong> {% if metric_data.R2 is not none %}{{ "%.4f"|format(metric_data.R2) }}{% else %}N/A{% endif %}</p>
+                            </div>
+                            <div class="metric">
+                                <p><strong>Erro Absoluto Médio (MAE):</strong> {% if metric_data.MAE is not none %}{{ "%.4f"|format(metric_data.MAE) }}{% else %}N/A{% endif %}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
         {% endif %}
         
-        <a href="{{ url_for('index') }}" class="back-button">Nova Análise</a>
-    </div>
-    <div class="footer">
-        <p>&copy; 2025 Análise de Microbiota. Todos os direitos reservados.</p>
+        <a href="{% if standalone_mode %}index.html{% else %}{{ url_for('index') }}{% endif %}" class="back-button">Realizar Nova Análise</a>
     </div>
 </body>
 </html>

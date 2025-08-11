@@ -8,6 +8,7 @@ from scipy.stats import entropy
 from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+import matplotlib.colors as mcolors
 import io
 import base64
 import google.generativeai as genai
@@ -17,19 +18,28 @@ from Bio import Entrez
 from skbio.stats.ordination import pcoa 
 from skbio import DistanceMatrix 
 from dotenv import load_dotenv
+import json
+from datetime import datetime
+
 load_dotenv()
 
 # Flask App Setup
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Variáveis alvo que o modelo irá predizer.
+# Variáveis alvo que o modelo irá predizer
 TARGET_VARIABLES = ["age_months", "body_weight"] 
 
 #CHAVES APIs
-DEV_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-DEV_NCBI_API_KEY = os.getenv("NCBI_API_KEY")
-NCBI_EMAIL = os.getenv("NCBI_EMAIL")
+DEV_GEMINI_API_KEY= "INSERIR A CHAVE ENVIADA NO EMAIL (GEMINI)"
+DEV_NCBI_API_KEY= "INSERIR A CHAVE ENVIADA NO EMAIL (NCBI)"
+NCBI_EMAIL="INSERIR O ENDEREÇO DE EMAIL ENVIADO"
+
+
+#CORES DA IDENTIDADE VISUAL
+PRIMARY_TEXT_COLOR = "#1A2C4B"
+ACCENT_COLOR = "#E91E63"
+ACCENT_LIGHT_COLOR = "#FCE4EC" 
 
 _gemini_api_configured_successfully = False
 _ncbi_api_configured_successfully = False 
@@ -39,251 +49,145 @@ _ncbi_api_configured_successfully = False
 if not os.path.exists(os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER'])):
     os.makedirs(os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER']))
 
-
+#Configura as APIs
 def configure_apis_global():
-    """
-    Configura as APIS do Gemini e do NCBI
-    """
-    global _gemini_api_configured_successfully
-    global _ncbi_api_configured_successfully 
-
-    print("DEBUG: Tentando configurar a API do Gemini...")
+    global _gemini_api_configured_successfully, _ncbi_api_configured_successfully
     if DEV_GEMINI_API_KEY and DEV_GEMINI_API_KEY != "chave":
         try:
             genai.configure(api_key=DEV_GEMINI_API_KEY)
             _gemini_api_configured_successfully = True
-            print("API do Gemini configurada globalmente com sucesso.")
         except Exception as e:
-            _gemini_api_configured_successfully = False
-            print(f"ERRO CRÍTICO: Falha ao configurar a API do Gemini globalmente: {e}")
-            print("Verifique se a DEV_GEMINI_API_KEY é válida e se há conexão com a internet.")
-    else:
-        _gemini_api_configured_successfully = False
-        print("AVISO: DEV_GEMINI_API_KEY não foi definida ou é o placeholder.")
-        print("A funcionalidade de insight da IA (Gemini) pode não estar disponível.")
-
-    print("DEBUG: Tentando configurar a API do NCBI (Entrez)...")
-    Entrez.email = NCBI_EMAIL 
-    if Entrez.email == "email":
-        print("AVISO: NCBI_EMAIL não foi definido. A API Entrez usará o limite de requisições padrão (mais baixo).")
-    
-    if DEV_NCBI_API_KEY and DEV_NCBI_API_KEY != "chave_ncbi":
+            print(f"ERRO CRÍTICO: Falha ao configurar a API do Gemini: {e}")
+    if NCBI_EMAIL and DEV_NCBI_API_KEY and DEV_NCBI_API_KEY != "chave_ncbi":
+        Entrez.email = NCBI_EMAIL
         Entrez.api_key = DEV_NCBI_API_KEY
         _ncbi_api_configured_successfully = True
-        print("API do NCBI (Entrez) configurada globalmente com sucesso com chave de API.")
-    else:
-        _ncbi_api_configured_successfully = False 
-        print("AVISO: DEV_NCBI_API_KEY não foi definida ou é o placeholder. A API Entrez usará o limite de requisições padrão (mais baixo).")
 
+#Carregamento dos arquivos (documentos alvo e referencia fornecidos)
 def load_data_from_memory(file_storage):
-    """
-    Carrega os dados e faz
-    """
     try:
         file_content = file_storage.read()
         file_stream = BytesIO(file_content)
-
         filename = file_storage.filename
+        df = None
+        if filename.endswith('.csv'):
+            try:
+                df = pd.read_csv(file_stream, sep=None, engine='python')
+            except Exception:
+                file_stream.seek(0)
+                df = pd.read_csv(file_stream, delimiter=';')
+        elif filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(file_stream)
         
-        df = None 
-
-        try:
-            df = pd.read_csv(file_stream) 
-            file_stream.seek(0) 
-
-            if len(df.columns) == 1 and ',' not in df.columns[0]: 
-                file_stream.seek(0) 
-                df_semicolon_try = pd.read_csv(file_stream, delimiter=';')
-                file_stream.seek(0) 
-                if len(df_semicolon_try.columns) > 1: 
-                    df = df_semicolon_try
-                    print("DEBUG: CSV lido com sucesso usando ponto e vírgula como delimitador.")
-                else:
-                    print("DEBUG: CSV lido com vírgula (default).")
-            else:
-                print("DEBUG: CSV lido com vírgula (default).")
-
-        except Exception as csv_error:
-            print(f"DEBUG: Falha na leitura como CSV. Erro: {csv_error}")
-            df = None 
-        
-        if df is None or df.empty: 
-            file_stream.seek(0) 
-            if filename.endswith('.xlsx'):
-                df = pd.read_excel(file_stream, engine='openpyxl')
-                print("DEBUG: Arquivo lido como XLSX.")
-            elif filename.endswith('.xls'):
-                df = pd.read_excel(file_stream, engine='xlrd')
-                print("DEBUG: Arquivo lido como XLS.")
-            else:
-                raise ValueError("Formato de arquivo não suportado ou erro na leitura CSV. Por favor, use CSV, XLSX ou XLS.")
-
-        if df.empty:
-            raise ValueError("O arquivo está vazio ou não pôde ser lido após todas as tentativas.")
-
+        if df is None or df.empty:
+            raise ValueError("Arquivo vazio ou formato não suportado/lido.")
         return df, None
     except Exception as e:
         return None, str(e)
 
+#Cálculo da alfa diversidade (métrica que avalia riqueza e diversidade intraindividual da microbiota)
 def calculate_alpha_diversity(microbiota_data):
-    """
-    Calcula o índice de Shannon
-    """
     microbiota_data = microbiota_data.fillna(0).astype(float)
     proportions = microbiota_data.apply(lambda x: x / x.sum() if x.sum() > 0 else x, axis=1)
     proportions[proportions == 0] = np.finfo(float).eps 
     alpha_diversity = entropy(proportions, base=np.e, axis=1)
     return pd.Series(alpha_diversity, index=microbiota_data.index)
 
+#Consulta no pubmed com base nas 3 espécies mais abundantes (utilizada para propor um laudo cientifico e individualizado)
 def generate_pubmed_query_for_bacteria(top_3_bacteria):
-    """
-    Gera uma consulta de busca otimizada para o PubMed com base nas 3 espécies mais abundantes, otimizada por IA.
-    """
-    if not top_3_bacteria: 
-        return "" 
+    if not top_3_bacteria or not _gemini_api_configured_successfully: return ""
+    
+    bacteria_names_clean = [name.replace("s__", "").replace("_", " ") for name in top_3_bacteria]
+    
+    bact_queries = []
+    for bact_name in bacteria_names_clean:
+        bact_queries.append(f'("{bact_name}"[MeSH Terms] OR "{bact_name}"[All Fields])')
+    
+    main_bact_query = " OR ".join(bact_queries)
 
-    bacteria_names_clean = [bacter_name.replace("s__", "").replace("_", " ") for bacter_name in top_3_bacteria]
-    
-    prompt = (f"Crie uma consulta de busca formatada para o PubMed. "
-              f"A busca deve ser sobre o papel e a importância das seguintes bactérias na microbiota intestinal humana: "
-              f"{', '.join(bacteria_names_clean)}. "
-              f"Inclua sinônimos e termos relacionados para cada bactéria. "
-              f"Use operadores booleanos (AND, OR) e sufixos de campo PubMed ([MeSH], [Title/Abstract]) para otimizar a busca. "
-              f"Também inclua termos gerais como 'gut microbiota', 'intestinal health', 'human', 'immune system', 'metabolism'. "
-              f"Priorize a abrangência para encontrar artigos relevantes. "
-              f"A saída deve ser APENAS a string da consulta, sem explicações ou formatação adicional. "
-              f"Exemplo: `(\"Bacteroides\"[MeSH] OR \"Bacteroides\"[Title/Abstract] OR \"Bacteroidetes\"[MeSH]) AND (\"gut microbiota\"[Title/Abstract] OR \"intestinal health\"[Title/Abstract])`"
-              f"Sua consulta:")
-    
+    prompt = (
+        f"Com base na seguinte lista de bactérias: {', '.join(bacteria_names_clean)}, "
+        f"gere uma consulta PubMed. A consulta principal para as bactérias, que já foi pré-formatada, é: `({main_bact_query})`. "
+        f"Sua tarefa é combinar esta consulta principal com termos gerais sobre microbiota intestinal humana usando o operador AND. "
+        f"A saída deve ser APENAS a string da consulta final."
+    )
     try:
-        model = genai.GenerativeModel() 
+        model = genai.GenerativeModel()
         response = model.generate_content(prompt)
-        pubmed_query = response.text.strip()
-        
-        pubmed_query = pubmed_query.strip('`" ') 
-
-        return pubmed_query
+        return response.text.strip().strip('`" ')
     except Exception as e:
-        print(f"DEBUG: Erro ao gerar consulta PubMed com Gemini: {e}") 
-        return "" 
+        print(f"DEBUG: Erro ao gerar consulta PubMed com Gemini: {e}")
+        return ""
 
 def search_pubmed_and_get_summaries(query, max_articles=5):
-    """
-    Busca artigos no PubMed usando a API Entrez e retorna os resumos dos artigos
-    """
-    global _ncbi_api_configured_successfully
-
-    if not _ncbi_api_configured_successfully and Entrez.email == "email":
-        print("AVISO: API Entrez não configurada (email ou chave inválida). Não será possível buscar no PubMed.")
-        return [] 
-
-    if not query:
-        return []
-
-    article_summaries = []
+    if not query or not _ncbi_api_configured_successfully: return []
     try:
         handle = Entrez.esearch(db="pubmed", term=query, retmax=max_articles, retmode="xml")
         record = Entrez.read(handle)
         handle.close()
         
-        id_list = record["IdList"]
+        id_list = record.get("IdList", [])
         print(f"DEBUG: Encontrados {len(id_list)} artigos no PubMed para a consulta.")
 
-        if not id_list:
-            return []
-
-        handle = Entrez.efetch(db="pubmed", id=id_list, rettype="abstract", retmode="xml") 
+        if not id_list: return []
+        
+        handle = Entrez.efetch(db="pubmed", id=id_list, rettype="abstract", retmode="xml")
         articles = Entrez.read(handle)
         handle.close()
-
-        for article in articles["PubmedArticle"]:
-            try:
-                title = article["MedlineCitation"]["Article"]["ArticleTitle"]
-                abstract_text = ""
-                if "Abstract" in article["MedlineCitation"]["Article"]:
-                    abstract_parts = article["MedlineCitation"]["Article"]["Abstract"]["AbstractText"]
-                    if isinstance(abstract_parts, list):
-                        abstract_text = " ".join(abstract_parts)
-                    else:
-                        abstract_text = abstract_parts 
-                
-                summary_entry = f"Título: {title}\nResumo: {abstract_text}\n"
-                if abstract_text.strip(): 
-                    article_summaries.append(summary_entry)
-                else:
-                    print(f"DEBUG: Resumo vazio para o artigo: {title}. Pulando.")
-
-            except KeyError:
-                print("DEBUG: Título ou Resumo não encontrado em estrutura esperada para um artigo. Pulando.")
-                continue
-            except Exception as extract_error:
-                print(f"DEBUG: Erro ao extrair resumo/título de um artigo: {extract_error}")
-                continue
-
+        
+        summaries = []
+        for article in articles.get("PubmedArticle", []):
+            title = article.get("MedlineCitation", {}).get("Article", {}).get("ArticleTitle", "")
+            abstract_parts = article.get("MedlineCitation", {}).get("Article", {}).get("Abstract", {}).get("AbstractText", [])
+            abstract = " ".join(abstract_parts) if isinstance(abstract_parts, list) else str(abstract_parts)
+            if title and abstract:
+                summaries.append(f"Título: {title}\nResumo: {abstract}\n")
+        return summaries
     except Exception as e:
-        print(f"DEBUG: Erro na busca ou fetch do PubMed via Entrez: {e}")
+        print(f"DEBUG: Erro na busca PubMed: {e}")
         return []
 
-    return article_summaries
-
-def summarize_articles_or_knowledge_with_gemini(article_texts, top_3_bacteria_names, num_articles_to_summarize=5):
-    """
-    Tenta resumir artigos fornecidos com Gemini. Se falhar ou não houver artigos, gera um resumo com base no conhecimento prévio do Gemini.
-    """
-    global _gemini_api_configured_successfully 
-
-    if not _gemini_api_configured_successfully:
-        return "API do Gemini não configurada globalmente. Não foi possível gerar resumo."
+def summarize_articles_or_knowledge_with_gemini(article_texts, top_3_bacteria_names):
+    if not _gemini_api_configured_successfully: return "Insight da IA indisponível."
     
-    model = genai.GenerativeModel() 
+    clean_names = ', '.join([name.replace("s__", "").replace("_", " ") for name in top_3_bacteria_names])
+    model = genai.GenerativeModel()
+    prompt_text = ""
 
     if article_texts:
-        combined_text = "\n\n---\n\n".join(article_texts[:num_articles_to_summarize])
-        if len(combined_text) > 15000: 
-            combined_text = combined_text[:15000] + "..." 
-        
-        try:
-            prompt_from_articles = (
-                f"Resuma os principais achados e a relevância biológica destes textos de artigos científicos sobre microbiota intestinal. "
-                f"Foque nos papéis das bactérias predominantes ({', '.join(top_3_bacteria_names)}) e no contexto de saúde humana. "
-                f"O resumo deve ter aproximadamente 5-7 linhas e ser conciso. Não inclua introdução ou conclusão. "
-                f"Use **apenas informações contidas nos textos fornecidos** e cite o artigo, se possível, de forma concisa. Exemplo: (Autor, Ano).\n\n"
-                f"Textos dos Artigos:\n{combined_text}"
-            )
-            response = model.generate_content(prompt_from_articles)
-            return response.text
-        except Exception as e:
-            print(f"DEBUG: Erro ao tentar resumir artigos: {e}. Tentando resumo baseado em conhecimento prévio.")
-            return summarize_from_knowledge_gemini(top_3_bacteria_names)
-    else:
-        return summarize_from_knowledge_gemini(top_3_bacteria_names)
-
-def summarize_from_knowledge_gemini(top_3_bacteria):
-    """
-    Gera um resumo sobre as bactérias com base no conhecimento prévio do Gemini.
-    """
-    global _gemini_api_configured_successfully 
-
-    if not _gemini_api_configured_successfully:
-        return "API do Gemini não configurada para gerar resumo baseado em conhecimento prévio."
-    
-    if not top_3_bacteria:
-        return "Não foi possível identificar bactérias para gerar um insight baseado em conhecimento prévio."
-
-    try:
-        model = genai.GenerativeModel() 
-        prompt_from_knowledge = (
-            f"Com base na literatura científica bem documentada, descreva o papel e a importância das seguintes bactérias predominantes na microbiota intestinal humana: "
-            f"{', '.join(top_3_bacteria)}. "
-            f"O resumo deve ser bem curto, com uma visão geral de aproximadamente 3-5 linhas. "
-            f"Não inclua introdução ou conclusão. Foque no papel geral e importância para a saúde."
+        print("DEBUG: Resumindo com base nos artigos encontrados no PubMed.")
+        combined_text = "\n\n---\n\n".join(article_texts)
+        prompt_text = (
+            f"Você é um assistente de análise de microbioma. Com base nos resumos de artigos científicos fornecidos, escreva um insight conciso sobre o que significa ter {clean_names} como as bactérias mais abundantes em uma amostra. "
+            f"Aborde a funcionalidade, a importância para a saúde e o potencial risco (se aplicável)."
         )
-        response = model.generate_content(prompt_from_knowledge)
+    elif top_3_bacteria_names:
+        print("DEBUG: Nenhum artigo encontrado. Resumindo com base no conhecimento geral da IA.")
+        prompt_text = (
+            f"Você é um assistente de análise de microbioma. Baseado no conhecimento científico geral, escreva um insight conciso sobre o que significa ter {clean_names} como as bactérias mais abundantes em uma amostra. "
+            f"Aborde a funcionalidade (o que fazem), a importância para a saúde (se são benéficas) e o potencial perigo (se podem ser patógenos oportunistas ou associadas a problemas quando em excesso)."
+        )
+    else:
+        return "Não foi possível gerar insight (sem bactérias para analisar)."
+    
+    try:
+        response = model.generate_content(prompt_text)
         return response.text
     except Exception as e:
-        print(f"DEBUG: Erro ao gerar resumo baseado em conhecimento prévio: {e}")
-        return f"Erro ao gerar resumo (conhecimento prévio): {e}. Verifique a API Gemini."
+        return f"Erro ao gerar insight da IA: {e}"
 
+#Exporta os resultados principais dos arquivos de referência e arquivos alvo (idade e peso predito, índice de shannon, MAZ para serem lidos posteriormente)
+def save_results_to_json(data):
+    upload_folder = os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER'])
+    if not os.path.exists(upload_folder): os.makedirs(upload_folder)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(upload_folder, f"analysis_results_{timestamp}.json")
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        print(f"Resultados salvos com sucesso em: {filepath}")
+    except Exception as e:
+        print(f"ERRO: Falha ao salvar o arquivo JSON: {e}")
 
 @app.route('/')
 def index():
@@ -291,297 +195,176 @@ def index():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    if 'reference_db' not in request.files or 'target_sample' not in request.files:
-        return render_template('results.html', error="Por favor, envie ambos os arquivos: Base de Dados de Referência e Amostra Alvo.")
-
+    #Treinamento dos modelos. É importante utilizar os modelos oferecidos como exemplo, considerando que o tratamento previo dos arquivos de referencia/alvo
+    #não foram considerados aqui para otimizar o script (a tabela de referencia e de alvos DEVEM ter as mesmas colunas)
+    if 'reference_db' not in request.files: return render_template('results.html', error="Por favor, envie o arquivo da Base de Dados de Referência.")
+    target_files = request.files.getlist('target_sample')
+    if not target_files or target_files[0].filename == '': return render_template('results.html', error="Por favor, envie pelo menos um arquivo de Amostra Alvo.")
     reference_file = request.files['reference_db']
-    target_file = request.files['target_sample']
-
-    if reference_file.filename == '' or target_file.filename == '':
-        return render_template('results.html', error="Nenhum arquivo selecionado. Por favor, selecione ambos os arquivos.")
-
     reference_db, error = load_data_from_memory(reference_file)
-    if error:
-        return render_template('results.html', error=f"Erro ao carregar a base de dados de referência: {error}")
-
-    target_sample, error = load_data_from_memory(target_file)
-    if error:
-        return render_template('results.html', error=f"Erro ao carregar a amostra alvo: {error}")
-
-
-    # Identifica as colunas de espécies na base de dados de referência
-    species_columns = [col for col in reference_db.columns if col not in TARGET_VARIABLES and col != 'microbial_age'] 
-    
-    if not species_columns:
-        return render_template('results.html', error="Nenhuma coluna de espécie bacteriana identificada na base de dados de referência. Verifique se as TARGET_VARIABLES estão corretas ou se o arquivo está vazio.")
-
-    for target_var in TARGET_VARIABLES:
-        if target_var not in reference_db.columns:
-            return render_template('results.html', error=f"A variável alvo '{target_var}' não foi encontrada na base de dados de referência. Verifique a lista TARGET_VARIABLES.")
-            
-    if len(reference_db) < 2:
-        return render_template('results.html', error="A base de dados de referência deve conter pelo menos 2 linhas (amostras) para treinar o modelo.")
-
+    if error: return render_template('results.html', error=f"Erro ao carregar a base de referência: {error}")
+    species_columns = [col for col in reference_db.columns if col not in TARGET_VARIABLES and col != 'microbial_age']
+    if not species_columns: return render_template('results.html', error="Nenhuma coluna de espécie identificada na base de referência.")
+    for var in TARGET_VARIABLES + ["age_months"]:
+        if var not in reference_db.columns: return render_template('results.html', error=f"Coluna necessária '{var}' não encontrada na base de referência.")
     X_ref = reference_db[species_columns]
-    y_ref = reference_db[TARGET_VARIABLES] 
-
-    if "age_months" not in reference_db.columns:
-        return render_template('results.html', error="A coluna 'age_months' é essencial para o cálculo do MAZ e não foi encontrada na base de dados de referência.")
-
-
-    #Alinha a amostra alvo com as colunas de espécies da base de dados de referência
-    target_sample_aligned = target_sample.reindex(columns=species_columns, fill_value=0)
-
-    if target_sample_aligned.empty or target_sample_aligned.isnull().all().all():
-        return render_template('results.html', error="Amostra alvo não contém dados compatíveis com as espécies da base de referência após o alinhamento. Verifique os nomes das colunas de espécies ou se o arquivo está vazio.")
-    
-    if len(target_sample_aligned) != 1:
-        return render_template('results.html', error="O arquivo da amostra alvo deve conter apenas uma linha de dados de um único indivíduo.")
-
-    # Modelos
-    predictions = {}
-    performance_metrics = {}
-
+    y_ref = reference_db[TARGET_VARIABLES]
+    if len(X_ref) < 2: return render_template('results.html', error="Base de referência precisa de ao menos 2 amostras.")
+    models, performance_metrics = {}, {}
     for target in TARGET_VARIABLES:
         y_target = y_ref[target]
-        
-        if len(X_ref) < 2: 
-            return render_template('results.html', error=f"Dados insuficientes na base de referência para treinar o modelo para '{target}'. Precisa de pelo menos 2 amostras.")
-
-        test_size = 0.2
-        if len(X_ref) * test_size < 1: 
-            test_size = 1 / len(X_ref) if len(X_ref) > 1 else 0 
-            if test_size == 0: 
-                return render_template('results.html', error=f"Dados insuficientes para dividir em treino/teste para '{target}'.")
-
-
-        try:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_ref, y_target, test_size=test_size, random_state=42
-            )
-        except ValueError as e:
-            return render_template('results.html', error=f"Erro ao dividir os dados para '{target}': {e}. Provavelmente, dados insuficientes ou coluna alvo com valores constantes.")
-            
+        test_size = 0.2 if len(X_ref) >= 5 else (1 / len(X_ref))
+        X_train, X_test, y_train, y_test = train_test_split(X_ref, y_target, test_size=test_size, random_state=42)
         model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+        models[target] = model
+        if len(y_test) > 0:
+            y_pred_test = model.predict(X_test)
+            r2 = r2_score(y_test, y_pred_test) if len(y_test.unique()) > 1 else 0.0
+            mae = mean_absolute_error(y_test, y_pred_test)
+            performance_metrics[target] = {"R2": r2, "MAE": mae}
+    microbial_age_model = RandomForestRegressor(n_estimators=100, random_state=42).fit(X_ref, reference_db["age_months"])
+    predicted_microbial_ages_ref = microbial_age_model.predict(X_ref)
+    mediana_microbiana_ref = np.median(predicted_microbial_ages_ref)
+    desvio_padrao_microbiano_ref = np.std(predicted_microbial_ages_ref)
+    ref_alpha_diversities = calculate_alpha_diversity(X_ref)
+    alpha_diversity_ref_mean = ref_alpha_diversities.mean()
+    alpha_diversity_ref_std = ref_alpha_diversities.std()
+
+    all_individual_results = []
+    for target_file in target_files:
+        individual_result = {"filename": target_file.filename}
+        target_sample, error = load_data_from_memory(target_file)
+        if error or (target_sample is not None and len(target_sample) != 1):
+            individual_result["error"] = error or "Arquivo alvo deve conter apenas uma linha."
+            all_individual_results.append(individual_result)
+            continue
         
-        try:
-            model.fit(X_train, y_train)
-        except ValueError as e:
-            return render_template('results.html', error=f"Erro ao treinar o modelo para '{target}': {e}. Verifique se há variância nos dados ou se há amostras suficientes.")
-
-        y_pred_test = model.predict(X_test)
+        target_sample_aligned = target_sample.reindex(columns=species_columns, fill_value=0)
         
-        r2 = None
-        mae = None
-        if len(y_test) > 1 and len(y_test.unique()) > 1: 
-            try:
-                r2 = r2_score(y_test, y_pred_test)
-            except Exception as e:
-                print(f"DEBUG: R2 calculation failed for {target}: {e}")
-                r2 = None 
-        else:
-            print(f"DEBUG: R2 not calculated for {target} due to insufficient test samples or constant values.")
+        predictions = {target: model.predict(target_sample_aligned)[0] for target, model in models.items()}
+        comparison_metrics = {}
+        for target in TARGET_VARIABLES:
+            comparison_metrics[target] = { "real": target_sample.get(target, [None])[0], "predicted": predictions.get(target) }
+        individual_result["comparison_metrics"] = comparison_metrics
 
-        if len(y_test) > 0: 
-            try:
-                mae = mean_absolute_error(y_test, y_pred_test)
-            except Exception as e:
-                print(f"DEBUG: MAE calculation failed for {target}: {e}")
-                mae = None
-
-        performance_metrics[target] = {"R2": r2, "MAE": mae}
-        
-        prediction = model.predict(target_sample_aligned)
-        predictions[target] = prediction[0]
-
-
-    microbial_age_predictor_model = RandomForestRegressor(n_estimators=100, random_state=42)
-    
-    if "age_months" not in reference_db.columns:
-        return render_template('results.html', error="A coluna 'age_months' é essencial na base de referência para treinar o modelo que calcula a 'microbial_age' (idade predita da microbiota) e, consequentemente, o MAZ.")
-    
-    y_age_months_ref_for_microbial_age_model = reference_db["age_months"]
-    
-    if len(X_ref) < 2:
-        return render_template('results.html', error="Dados insuficientes para treinar o modelo que calcula 'microbial_age' a partir da base de referência (requer pelo menos 2 amostras).")
-
-    try:
-        microbial_age_predictor_model.fit(X_ref, y_age_months_ref_for_microbial_age_model)
-    except ValueError as e:
-        return render_template('results.html', error=f"Erro ao treinar o modelo para calcular 'microbial_age' (baseado em age_months): {e}. Verifique a variância em 'age_months' ou a quantidade de amostras na base de referência.")
-
-    predicted_microbial_ages_ref_array = microbial_age_predictor_model.predict(X_ref)
-    
-    mediana_microbiana_ref = np.median(predicted_microbial_ages_ref_array)
-    desvio_padrao_microbiano_ref = np.std(predicted_microbial_ages_ref_array)
-
-    predicted_microbial_age_target = microbial_age_predictor_model.predict(target_sample_aligned)[0] 
-    
-    maz_value = None
-    if predicted_microbial_age_target is not None:
+        predicted_microbial_age_target = microbial_age_model.predict(target_sample_aligned)[0]
         if desvio_padrao_microbiano_ref > 0:
-            maz_value = (predicted_microbial_age_target - mediana_microbiana_ref) / desvio_padrao_microbiano_ref
+            individual_result["maz_value"] = (predicted_microbial_age_target - mediana_microbiana_ref) / desvio_padrao_microbiano_ref
         else:
-            maz_value = 0.0 if predicted_microbial_age_target == mediana_microbiana_ref else None 
-    else:
-        return render_template('results.html', error="Não foi possível obter a 'microbial_age' predita para o indivíduo alvo para calcular o MAZ.")
+            individual_result["maz_value"] = 0.0
+        
+        individual_result["alpha_diversity_value"] = calculate_alpha_diversity(target_sample_aligned).iloc[0]
 
+        target_abund = target_sample_aligned.iloc[0].nlargest(10)
+        top_3_bacteria = target_abund.head(3).index.tolist()
+        
+        #Grafico de abundancia das espécies
+        fig_bar = Figure(figsize=(10, 6), dpi=150)
+        fig_bar.patch.set_alpha(0.0)
+        ax_bar = fig_bar.add_subplot(111)
+        ax_bar.set_facecolor('#FFFFFF00')
+        bar_colors = mcolors.LinearSegmentedColormap.from_list("grad", [ACCENT_LIGHT_COLOR, ACCENT_COLOR])
+        normalized_values = plt.Normalize(target_abund.min(), target_abund.max())
 
-    # Alfa Diversidade do Indivíduo Alvo (Shannon Index)
-    alpha_diversity_value = None
-    try:
-        target_species_data = target_sample_aligned[species_columns]
-        alpha_diversity_series = calculate_alpha_diversity(target_species_data)
-        alpha_diversity_value = alpha_diversity_series.iloc[0] if not alpha_diversity_series.empty else None
-    except Exception as e:
-        print(f"Erro ao calcular alfa diversidade: {e}")
-        alpha_diversity_value = None
+        ax_bar.bar([l.replace('_', ' ').replace(' ', '\n') for l in target_abund.index], 
+                   target_abund.values, 
+                   color=bar_colors(normalized_values(target_abund.values)),
+                   edgecolor=PRIMARY_TEXT_COLOR,
+                   linewidth=0.5)
 
-    # Cálculo da média e desvio padrão do índice de Shannon da base de referência
-    alpha_diversity_ref_mean = None
-    alpha_diversity_ref_std = None
-    try:
-        ref_species_data = X_ref[species_columns] 
-        if not ref_species_data.empty:
-            ref_alpha_diversities = calculate_alpha_diversity(ref_species_data)
-            alpha_diversity_ref_mean = ref_alpha_diversities.mean()
-            alpha_diversity_ref_std = ref_alpha_diversities.std()
-    except Exception as e:
-        print(f"Erro ao calcular média/std da alfa diversidade da referência: {e}")
-        alpha_diversity_ref_mean = None
-        alpha_diversity_ref_std = None
+        ax_bar.set_title(f'Top 10 Bactérias - {target_file.filename}', color=PRIMARY_TEXT_COLOR, fontweight='bold', fontsize=14)
+        ax_bar.set_ylabel('Abundância Relativa', color=PRIMARY_TEXT_COLOR, fontsize=12)
+        ax_bar.tick_params(axis='x', colors=PRIMARY_TEXT_COLOR, rotation=45)
+        ax_bar.tick_params(axis='y', colors=PRIMARY_TEXT_COLOR)
+        ax_bar.grid(axis='y', linestyle='--', color='grey', alpha=0.5)
+        ax_bar.spines['top'].set_visible(False)
+        ax_bar.spines['right'].set_visible(False)
+        ax_bar.spines['bottom'].set_color('grey')
+        ax_bar.spines['left'].set_color('grey')
 
+        fig_bar.tight_layout()
+        buf_bar = io.BytesIO()
+        fig_bar.savefig(buf_bar, format='png', bbox_inches='tight', transparent=True)
+        plt.close(fig_bar)
+        individual_result["top_bacteria_plot_url"] = base64.b64encode(buf_bar.getvalue()).decode('utf-8')
+        
+        #Print do resumo gerado por IA.
+        print(f"\n--- Gerando Insight para {target_file.filename} ---")
+        query = generate_pubmed_query_for_bacteria(top_3_bacteria)
+        if query: print(f"DEBUG: Consulta PubMed gerada: {query}")
+        summaries = search_pubmed_and_get_summaries(query) if query else []
+        individual_result["gemini_insight_text"] = summarize_articles_or_knowledge_with_gemini(summaries, top_3_bacteria)
+        print("--- Fim do Insight ---")
 
-    # Beta Diversidade (Bray-Curtis) PCoA Plot 
-    pcoa_plot_url = None
-    try:
-        combined_data_for_beta = pd.concat([X_ref, target_sample_aligned], ignore_index=True)
-        combined_data_for_beta = combined_data_for_beta.fillna(0).astype(float)
-
-        if len(combined_data_for_beta) > 2: 
-            dm = DistanceMatrix(squareform(pdist(combined_data_for_beta, metric='braycurtis')))
-            pcoa_results = pcoa(dm)
-            
-            coords = pcoa_results.samples[['PC1', 'PC2']].values 
-
-            fig = Figure(figsize=(8, 6))
-            ax = fig.add_subplot(111)
-            
-            age_months_ref_plot = reference_db['age_months'].values
-            age_months_target_plot = predictions.get("age_months") 
-
-            all_ages_for_plot = np.append(age_months_ref_plot, age_months_target_plot)
-            
-            scatter = ax.scatter(coords[:, 0], coords[:, 1], c=all_ages_for_plot, cmap='viridis', label='Amostras', alpha=0.7)
-            
-            ax.scatter(coords[-1, 0], coords[-1, 1], c='red', marker='X', s=150, label='Indivíduo Alvo', edgecolor='black', linewidth=1.5, zorder=10) 
-            
-            ax.set_xlabel('PCo1')
-            ax.set_ylabel('PCo2')
-            ax.set_title('PCoA da Composição da Microbiota por Idade (Distância Bray-Curtis)')
-            ax.legend()
-            ax.grid(True, linestyle='--', alpha=0.6)
-
-            cbar = fig.colorbar(scatter, ax=ax)
-            cbar.set_label('Idade em Meses')
-
-            buf = io.BytesIO()
-            fig.savefig(buf, format='png', bbox_inches='tight')
-            buf.seek(0)
-            pcoa_plot_url = base64.b64encode(buf.read()).decode('utf-8')
-            plt.close(fig) 
-        else:
-            return render_template('results.html', error=f"Dados insuficientes para o cálculo do PCoA. Precisa de mais de 2 amostras combinadas para calcular as coordenadas.")
-
-
-    except Exception as e:
+        #Gráfico PCoA (beta - diversidade), considerando a diversidade da microbiota entre os indivíduos
         pcoa_plot_url = None
-        print(f"Erro ao gerar o gráfico PCoA: {e}") 
+        try:
+            combined_data_for_beta = pd.concat([X_ref, target_sample_aligned], ignore_index=True).fillna(0).astype(float)
+            if len(combined_data_for_beta) > 2:
+                dm = DistanceMatrix(squareform(pdist(combined_data_for_beta, metric='braycurtis')))
+                pcoa_results = pcoa(dm)
+                coords = pcoa_results.samples[['PC1', 'PC2']].values
+                if np.isnan(coords).any(): raise ValueError("Coordenadas PCoA com valores NaN.")
 
+                fig = Figure(figsize=(8, 8), dpi=150)
+                fig.patch.set_alpha(0.0) 
+                ax = fig.add_subplot(111)
+                ax.set_facecolor('#FFFFFF00')
 
-    # Gráfico de Barras das 10 Bactérias Mais Abundantes no Indivíduo Alvo
-    top_bacteria_plot_url = None
-    top_3_bacteria_names = []
-    try:
-        target_bacteria_abundance_series = target_sample_aligned.iloc[0][species_columns] 
-        
-        target_bacteria_abundance_filtered = target_bacteria_abundance_series[target_bacteria_abundance_series > 0]
-        
-        top_10 = target_bacteria_abundance_filtered.nlargest(10) 
-        
-        if not top_10.empty:
-            top_3_bacteria_names = top_10.head(3).index.tolist()
-
-            if len(target_bacteria_abundance_filtered) > 10:
-                others_sum = target_bacteria_abundance_filtered.drop(top_10.index, errors='ignore').sum()
-                top_10 = pd.concat([top_10, pd.Series({'Outros': others_sum}, index=['Outros'])]) 
+                ages_ref = reference_db['age_months'].values
+                age_target_predicted = individual_result['comparison_metrics']['age_months']['predicted']
+                all_ages_for_plot = np.append(ages_ref, age_target_predicted)
                 
-            fig_bar = Figure(figsize=(10, 6))
-            ax_bar = fig_bar.add_subplot(111)
-            
-            labels = [label.replace('_', ' ').replace(' ', '\n') for label in top_10.index]
-            
-            ax_bar.bar(labels, top_10.values, color='skyblue')
-            ax_bar.set_ylabel('Abundância Relativa')
-            ax_bar.set_title('Bactérias Mais Abundantes no Indivíduo Alvo') 
-            ax_bar.tick_params(axis='x', rotation=45) 
-            fig_bar.tight_layout()
+                pcoa_cmap = mcolors.LinearSegmentedColormap.from_list("pcoa_grad", ["#DDDDDD", ACCENT_LIGHT_COLOR, ACCENT_COLOR])
 
-            buf_bar = io.BytesIO()
-            fig_bar.savefig(buf_bar, format='png', bbox_inches='tight')
-            buf_bar.seek(0)
-            top_bacteria_plot_url = base64.b64encode(buf_bar.read()).decode('utf-8')
-            plt.close(fig_bar)
-        else:
-            top_bacteria_plot_url = None 
-            top_3_bacteria_names = [] 
-            print("DEBUG: Nenhuma bactéria com abundância > 0 encontrada na amostra alvo para plotagem.")
-            
-    except Exception as e:
-        top_bacteria_plot_url = None
-        top_3_bacteria_names = [] 
-        print(f"Erro ao gerar o gráfico de barras das bactérias: {e}")
+                scatter = ax.scatter(coords[:, 0], coords[:, 1], c=all_ages_for_plot, cmap=pcoa_cmap, alpha=0.8, s=60, edgecolor='#FFFFFF', linewidth=0.5)
+                
+                ax.scatter(coords[-1, 0], coords[-1, 1], facecolors='none', edgecolors=PRIMARY_TEXT_COLOR, s=200, linewidth=2, label='Indivíduo Alvo')
+                ax.set_title('Análise de Similaridade da Microbiota (PCoA)', color=PRIMARY_TEXT_COLOR, fontweight='bold', fontsize=14)
+                ax.set_xlabel('Componente Principal 1', color=PRIMARY_TEXT_COLOR, fontsize=12)
+                ax.set_ylabel('Componente Principal 2', color=PRIMARY_TEXT_COLOR, fontsize=12)
+                ax.tick_params(axis='x', colors=PRIMARY_TEXT_COLOR)
+                ax.tick_params(axis='y', colors=PRIMARY_TEXT_COLOR)
+                ax.grid(True, linestyle='--', color='grey', alpha=0.5)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_color('grey')
+                ax.spines['left'].set_color('grey')
 
-    pubmed_search_query = ""
-    pubmed_summary_text = ""
-    try:
-        pubmed_search_query = generate_pubmed_query_for_bacteria(top_3_bacteria_names)
+                legend = ax.legend()
+                for text in legend.get_texts():
+                    text.set_color(PRIMARY_TEXT_COLOR)
+                
+                cbar = fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.04)
+                cbar.set_label('Idade em Meses (Real ou Predita)', color=PRIMARY_TEXT_COLOR, fontsize=12)
+                cbar.ax.yaxis.set_tick_params(color=PRIMARY_TEXT_COLOR)
+                plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=PRIMARY_TEXT_COLOR)
+
+                fig.tight_layout()
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches='tight', transparent=True)
+                plt.close(fig)
+                pcoa_plot_url = base64.b64encode(buf.getvalue()).decode('utf-8')
+        except Exception as e:
+            print(f"ERRO AO GERAR GRÁFICO PCOA para {target_file.filename}: {e}")
         
-        if pubmed_search_query:
-            print(f"DEBUG: Consulta PubMed gerada: {pubmed_search_query}")
-            article_summaries_raw = search_pubmed_and_get_summaries(pubmed_search_query, max_articles=5)
-            
-            if article_summaries_raw:
-                pubmed_summary_text = summarize_articles_or_knowledge_with_gemini(article_summaries_raw, top_3_bacteria_names, num_articles_to_summarize=5)
-            else:
-                print("DEBUG: Sem resumos válidos do PubMed, caindo para resumo baseado em conhecimento prévio.")
-                pubmed_summary_text = summarize_from_knowledge_gemini(top_3_bacteria_names)
-        else:
-            print("DEBUG: Consulta PubMed não gerada, caindo para resumo baseado em conhecimento prévio.")
-            pubmed_summary_text = summarize_from_knowledge_gemini(top_3_bacteria_names)
-
-    except Exception as e:
-        pubmed_summary_text = f"Erro geral ao buscar ou resumir artigos PubMed: {e}. Caindo para resumo baseado em conhecimento prévio."
-        print(f"DEBUG: Erro geral no fluxo PubMed/Resumo: {e}. Caindo para resumo baseado em conhecimento prévio.")
-        pubmed_summary_text = summarize_from_knowledge_gemini(top_3_bacteria_names)
-
-
-    display_predictions = predictions 
-
-
-    return render_template('results.html', 
-                           predictions=display_predictions, 
-                           metrics=performance_metrics,
-                           maz_value=maz_value,
-                           alpha_diversity_value=alpha_diversity_value,
-                           alpha_diversity_ref_mean=alpha_diversity_ref_mean, 
-                           alpha_diversity_ref_std=alpha_diversity_ref_std,   
-                           pcoa_plot_url=pcoa_plot_url,
-                           top_bacteria_plot_url=top_bacteria_plot_url,
-                           gemini_insight_text=pubmed_summary_text) 
+        individual_result["pcoa_plot_url"] = pcoa_plot_url
+        all_individual_results.append(individual_result)
+    
+    #  montagem do JSON e renderização
+    final_results = {
+        "analysis_timestamp": datetime.now().isoformat(),
+        "reference_file": reference_file.filename,
+        "model_performance": performance_metrics,
+        "reference_alpha_diversity": {"mean": alpha_diversity_ref_mean, "std": alpha_diversity_ref_std},
+        "reference_maz_mean": 0.0,
+        "individual_analyses": all_individual_results
+    }
+    save_results_to_json(final_results)
+    return render_template('results.html', results=final_results)
 
 if __name__ == '__main__':
     with app.app_context():
-        configure_apis_global() 
-
+        configure_apis_global()
     app.run(debug=True)

@@ -1,63 +1,172 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análise de Microbiota Intestinal</title>
+    <title>Inside Análises | Plataforma de Predição</title>
+    {% if standalone_mode %}
+        <link rel="icon" type="image/png" href="static/inside_logo.png">
+    {% else %}
+        <link rel="icon" type="image/png" href="{{ url_for('static', filename='inside_logo.png') }}">
+    {% endif %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); max-width: 600px; margin: auto; }
-        h1 { text-align: center; color: #333; }
-        form { display: flex; flex-direction: column; gap: 15px; }
-        label { font-weight: bold; margin-bottom: 5px; display: block; }
-        input[type="file"] { border: 1px solid #ddd; padding: 8px; border-radius: 4px; background-color: #f9f9f9; }
-        button { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s ease; }
-        button:hover { background-color: #45a049; }
-        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 0.9em; }
-
-        /* Estilos para o feedback de carregamento */
-        .loading-message { display: none; text-align: center; margin-top: 20px; font-style: italic; color: #555; }
+        :root {
+            --primary-text: #1A2C4B;
+            --accent-color: #E91E63;
+            --background-light: #f8f9fa;
+            --white: #ffffff;
+            --gray: #6c757d;
+        }
+        body {
+            font-family: 'Poppins', Arial, sans-serif;
+            margin: 0;
+            background-color: var(--background-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--primary-text);
+        }
+        .container {
+            background-color: var(--white);
+            padding: 40px 50px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .logo-container {
+            max-width: 200px;
+            margin: 0 auto 20px;
+        }
+        .logo {
+            width: 100%;
+            height: auto;
+        }
+        .header h1 {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .header h1 span {
+            color: var(--accent-color);
+        }
+        .header p {
+            color: var(--gray);
+            margin-bottom: 30px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            text-align: left;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+        }
+        input[type="file"] {
+            border: 2px dashed #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #fdfdfd;
+            cursor: pointer;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        input[type="file"]::-webkit-file-upload-button {
+            display: none;
+        }
+        input[type="file"]::before {
+            content: 'Arraste ou clique para selecionar os arquivos';
+            display: block;
+            text-align: center;
+            color: var(--gray);
+        }
+        input[type="file"]:hover {
+            border-color: var(--accent-color);
+            background-color: #ffebee;
+        }
+        button {
+            background: linear-gradient(45deg, var(--accent-color), #f48fb1);
+            color: white;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #aaa;
+            font-size: 0.85em;
+        }
+        .loading-message { display: none; text-align: center; margin-top: 20px; color: var(--gray); }
         .spinner {
             border: 4px solid rgba(0, 0, 0, 0.1);
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            border-left-color: #4CAF50;
+            border-left-color: var(--accent-color);
             animation: spin 1s ease infinite;
-            margin: 10px auto;
-            display: none; /* Escondido por padrão */
+            margin: 20px auto;
+            display: none;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Análise de Microbiota Intestinal</h1>
-        <p>Faça o upload da sua base de dados de referência (CSV/Excel) e da amostra alvo (CSV/Excel) para obter as predições.</p>
+        <div class="header">
+            <div class="logo-container">
+                {% if standalone_mode %}
+                    <img src="static/inside_logo.png" alt="Logo Inside Diagnósticos" class="logo">
+                {% else %}
+                    <img src="{{ url_for('static', filename='inside_logo.png') }}" alt="Logo Inside Diagnósticos" class="logo">
+                {% endif %}
+            </div>
+            <h1>Plataforma de Análise<span>.</span></h1>
+            <p>Faça o upload dos arquivos para iniciar a análise preditiva da microbiota.</p>
+        </div>
         <form action="/analyze" method="post" enctype="multipart/form-data" onsubmit="showLoading()">
-            <label for="reference_db">Base de Dados de Referência (CSV/Excel):</label>
-            <input type="file" name="reference_db" id="reference_db" accept=".csv, .xlsx, .xls" required>
-
-            <label for="target_sample">Amostra Alvo (CSV/Excel - um indivíduo):</label>
-            <input type="file" name="target_sample" id="target_sample" accept=".csv, .xlsx, .xls" required>
-
-            <button type="submit" id="analyzeButton">Analisar</button>
+            <div>
+                <label for="reference_db">Base de Dados de Referência (CSV/Excel)</label>
+                <input type="file" name="reference_db" id="reference_db" accept=".csv, .xlsx, .xls" required>
+            </div>
+            <div>
+                <label for="target_sample">Amostra(s) Alvo (CSV/Excel)</label>
+                <input type="file" name="target_sample" id="target_sample" accept=".csv, .xlsx, .xls" required multiple>
+            </div>
+            <button type="submit" id="analyzeButton">Analisar Amostras</button>
             <div class="loading-message" id="loadingMessage">Processando... Por favor, aguarde.</div>
             <div class="spinner" id="loadingSpinner"></div>
         </form>
-    </div>
-    <div class="footer">
-        <p>&copy; 2024 Análise de Microbiota. Todos os direitos reservados.</p>
+        <div class="footer">
+            <p>&copy; Teste backend 2025 - Inside Diagnósticos. Todos os direitos reservados.</p>
+        </div>
     </div>
 
     <script>
         function showLoading() {
-            document.getElementById('analyzeButton').disabled = true; // Desabilita o botão
-            document.getElementById('loadingMessage').style.display = 'block'; // Mostra a mensagem
-            document.getElementById('loadingSpinner').style.display = 'block'; // Mostra o spinner
+            document.getElementById('analyzeButton').disabled = true;
+            document.getElementById('analyzeButton').innerText = 'Processando...';
+            document.getElementById('loadingMessage').style.display = 'block';
+            document.getElementById('loadingSpinner').style.display = 'block';
         }
     </script>
 </body>
