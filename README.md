@@ -41,18 +41,26 @@ Todas as bibliotecas necessárias estão listadas no arquivo requirements.txt. I
 
 pip install -r requirements.txt
 
-Passo 4: Configurar as Chaves de API
-Para que a geração de insights com IA funcione, você precisa configurar suas chaves de API.
+Passo 4: Configurar as Chaves de API (Passo Crucial)
+Para que a geração de insights com IA funcione, você precisa inserir as chaves de API diretamente no código. As chaves necessárias serão fornecidas por e-mail.
 
-Crie uma cópia do arquivo .env.example e renomeie-a para .env.
+Abra o arquivo app.py em um editor de código.
 
-Abra o novo arquivo .env e insira suas chaves de API do Google Gemini e do NCBI.
+Localize as seguintes linhas (próximo à linha 18):
 
-DEV_GEMINI_API_KEY="SUA_CHAVE_REAL_DO_GEMINI_AQUI"
-DEV_NCBI_API_KEY="SUA_CHAVE_REAL_DO_NCBI_AQUI"
-NCBI_EMAIL="SEU_EMAIL_CADASTRADO_NO_NCBI"
+#CHAVES APIs
+DEV_GEMINI_API_KEY= "INCLUIR CHAVE GEMINI"
+DEV_NCBI_API_KEY= "INCLUIR CHAVE NCBI"
+NCBI_EMAIL="INCLUIR EMAIL"
 
-⚠️ Segurança: Suas chaves estão seguras. O arquivo .env está no .gitignore e nunca será enviado para o GitHub.
+Substitua os textos de exemplo pelas chaves e e-mail que você recebeu. O resultado deve ser parecido com isto:
+
+#CHAVES APIs
+DEV_GEMINI_API_KEY= "sua-chave-real-do-gemini-aqui"
+DEV_NCBI_API_KEY= "sua-chave-real-do-ncbi-aqui"
+NCBI_EMAIL="seu-email-real-aqui"
+
+Salve o arquivo app.py.
 
 Passo 5: Executar a Aplicação
 Com tudo configurado, inicie o servidor Flask:
