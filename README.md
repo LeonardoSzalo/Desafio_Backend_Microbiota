@@ -1,6 +1,6 @@
 🧬 Plataforma de Análise Preditiva de Microbiota
 <div align="center">
-<img src="https://www.google.com/search?q=https://raw.githubusercontent.com/LeonardoSzalo/Desafio_Backend_Microbiota/main/static/inside_logo.png" alt="Logo Inside Diagnósticos" width="250px">
+<img src="https://raw.githubusercontent.com/LeonardoSzalo/Desafio_Backend_Microbiota/main/static/inside_logo.png" alt="Logo Inside Diagnósticos" width="250px">
 </div>
 
 <p align="center">
@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota"><img src="https://www.google.com/search?q=https://img.shields.io/badge/Reposit%C3%B3rio-GitHub-blueviolet" alt="Repositório"></a>
+<a href="https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota"><img src="https://img.shields.io/badge/Repositório-GitHub-blueviolet" alt="Repositório"></a>
 <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Versão do Python">
 <img src="https://img.shields.io/badge/Framework-Flask-black.svg" alt="Flask">
 </p>
@@ -19,7 +19,7 @@ Este guia detalha o passo a passo para clonar, configurar e executar a plataform
 Passo 1: Clonar o Repositório
 Primeiro, clone este repositório para a sua máquina local usando o seguinte comando no terminal:
 
-git clone [https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota.git](https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota.git)
+git clone https://github.com/LeonardoSzalo/Desafio_Backend_Microbiota.git
 cd Desafio_Backend_Microbiota
 
 Passo 2: Configurar o Ambiente Virtual
