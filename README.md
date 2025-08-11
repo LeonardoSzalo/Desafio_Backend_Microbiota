@@ -118,6 +118,7 @@ Encontre o arquivo .json da análise desejada dentro da pasta uploads/.
 Execute o seguinte comando no terminal, substituindo o nome do arquivo pelo seu:
 
 ```bash
+#Altere o nome do arquivo "entre aspas" conforme o último arquivo gerado/arquivo que você quer rever, sem precisar analisar novamente.
 python gerador_html.py "uploads/analysis_results_20250811_144205.json"
 ```
 
